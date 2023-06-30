@@ -28,5 +28,3 @@ export class Piece extends Component {
         this.changeTexture()
     }
 }
-
-

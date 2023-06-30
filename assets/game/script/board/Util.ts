@@ -50,7 +50,7 @@ export function iccsPosToPos(iccsFile: string, iccsRank: string) {
 	return getSoltByRankAndFile(rank, file)
 }
 
-export function iccsMoveToMove(iccsMove: number) {
+export function iccsMoveToMove(iccsMove: string) {
 	let start = iccsPosToPos(iccsMove[0], iccsMove[1])
 	let end = iccsPosToPos(iccsMove[2], iccsMove[3])
 	return getMove(start, end)

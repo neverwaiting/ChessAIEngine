@@ -1,9 +1,12 @@
-enum ProtocolType {
-    GET_ENGINES_REQUEST = 1,
-    GET_ENGINES_RESPONSE = 2,
+import { Board } from "./Board"
 
-    START = 3, // { red: { number }, black: { number }}
-    MOVE = 4, // { mv: string, over: true }
+enum ProtocolType {
+    GAME_START_REQUEST = 1,
+    GET_ENGINES_REQUEST = 2,
+    GET_ENGINES_RESPONSE = 3,
+
+    START = 4, // { red: { number }, black: { number }}
+    MOVE = 5, // { mv: string, over: true }
 }
 
 class Package {
@@ -13,6 +16,7 @@ class Package {
 
 export class Net {
     websocket: WebSocket
+    board: Board
 
     // protocol
 
@@ -35,14 +39,13 @@ export class Net {
 
     onOpen(event: Event) {
         console.log('ws connection open', event)
-        setInterval(() => {
-            this.sendGetEnginesReq()
-        }, 1000);
+        this.sendGameStartReq()
     }
 
     onMessage(event: MessageEvent) {
         let message = JSON.parse(event.data)
         console.log('message:', message)
+        this.handlePackage(message)
     }
 
     onError(event: Event) {
@@ -53,9 +56,24 @@ export class Net {
         console.log('ws connection close', event.reason)
     }
 
+    handlePackage(message: Package) {
+        if (message.type == ProtocolType.MOVE) {
+            if (!this.board) return
+            this.board.playIccsMove(message.data["mv"])
+        }
+    }
+
     sendPackage(message: Package) {
         let data = JSON.stringify(message)
         this.websocket.send(data)
+    }
+
+    sendGameStartReq() {
+        let pack = {
+            type: ProtocolType.GAME_START_REQUEST,
+            data: null
+        }
+        this.sendPackage(pack)
     }
 
     sendGetEnginesReq() {

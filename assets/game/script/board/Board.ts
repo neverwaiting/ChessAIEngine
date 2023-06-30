@@ -1,6 +1,6 @@
-import { _decorator, Component, EventTouch, instantiate, Node, Prefab, UITransform, v3, Vec3 } from 'cc';
+import { _decorator, assert, Component, EditBox, EventTouch, instantiate, Node, Prefab, Tween, tween, TweenAction, UITransform, v3, Vec3 } from 'cc';
 import { Piece } from './Piece';
-import { getFileOfSolt, getRankOfSolt, getSoltByRankAndFile } from './Util';
+import { endOfMove, getFileOfSolt, getRankOfSolt, getSoltByRankAndFile, iccsMoveToMove, startOfMove } from './Util';
 import { PieceType, SIDE_TYPE_BLACK, SIDE_TYPE_RED, SideType } from './Common';
 import { SidePlayer } from './SidePlayer';
 import { FenParser } from './FenParser';
@@ -33,6 +33,12 @@ export class Board extends Component {
     selectedPiece: Piece | null = null
 
     prompt: boolean = false
+
+    animationQueue: Array<Tween<Node>> = new Array<Tween<Node>>()
+    playingAnimation: boolean = false
+
+    @property(EditBox)
+    editBox: EditBox = null
 
     protected onLoad(): void {
         this.init()
@@ -162,10 +168,82 @@ export class Board extends Component {
     }
 
     movePiece(piece: Piece, dest: number) {
+        this.removePieceFromBoard(piece.solt)
+        let endPiece = this.removePieceFromBoard(dest)
+        this.addPieceToBoard(piece, dest)
+        let tween = this.playMovePieceAction(piece, dest, endPiece)
+        if (this.animationQueue.length != 0 || this.playingAnimation) this.animationQueue.push(tween)
+        else tween.start()
+    }
 
+    removePieceFromBoard(pos: number) {
+        let delPiece = this.pieces[pos]
+        this.pieces[pos] = null
+        return delPiece
+    }
+
+    addPieceToBoard(piece: Piece, pos: number) {
+        piece.solt = pos
+        this.pieces[pos] = piece
+    }
+
+    playMovePieceAction(piece: Piece, dest: number, endPiece: Piece | null) {
+        let pieceNode = piece.node
+        let endPos = this.convertToNodePos(dest)
+        return tween(pieceNode)
+        .call(() => {
+            pieceNode.setSiblingIndex(this.node.children.length - 1)
+            this.playingAnimation = true
+        })
+        .to(0.1, { position: endPos })
+        .call(() => {
+            if (endPiece) endPiece.node.removeFromParent()
+            if (this.animationQueue.length != 0) {
+                let action = this.animationQueue[0]
+                this.animationQueue.shift()
+                action.start()
+            } else {
+                this.playingAnimation = false
+            }
+        })
     }
 
     isSameSidePiece(pieceA: Piece, pieceB: Piece) {
         return pieceA && pieceB && pieceA.sidePlayer.side == pieceB.sidePlayer.side
+    }
+
+    getOppPlayerByPlayer(player: SidePlayer) {
+        return this.redSidePlayer == player ? this.blackSidePlayer : this.redSidePlayer
+    }
+
+    getOppPlayer() {
+        return this.getOppPlayerByPlayer(this.curSidePlayer)
+    }
+
+    changeSide() {
+        this.curSidePlayer = this.getOppPlayer()
+    }
+
+    playIccsMove(iccsMv: string) {
+        let mv = iccsMoveToMove(iccsMv)
+        console.log(mv)
+
+        let start = startOfMove(mv)
+        let end = endOfMove(mv)
+        let piece = this.pieces[start]
+
+        if (!piece || piece.sidePlayer != this.curSidePlayer) return
+
+        this.movePiece(piece, end)
+        this.changeSide()
+    }
+
+    onClickForMoveBtn() {
+        let str = this.editBox.string
+        console.log(str)
+        if (str != null && str.length == 4) {
+            this.playIccsMove(str)
+        }
+        this.editBox.string = ""
     }
 }
